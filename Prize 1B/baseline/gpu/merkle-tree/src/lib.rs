@@ -17,7 +17,7 @@ pub use circuit::MerkleTreeCircuit;
 pub use path::Path;
 pub use tree::MerkleTree;
 
-pub const HEIGHT: usize = 15;
+pub const HEIGHT: usize = 10;
 
 pub type PoseidonHash = PoseidonRef<(), NativeSpecRef<Fr>, 3>;
 
@@ -58,3 +58,4 @@ pub(crate) fn assert_hash_constraints(
 
     composer.assert_equal(*output, output_rec);
 }
+

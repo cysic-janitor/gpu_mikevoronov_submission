@@ -31,7 +31,7 @@ fn build_tree<R: RngCore>(
 
 fn send_poseidon_constants(poseidon_constants: &PoseidonConstants<Fr>) {
     let mut matrix = Vec::with_capacity(9);
-    let mut tag = vec![poseidon_constants.domain_tag];
+    let tag = vec![poseidon_constants.domain_tag];
 
     for row_idx in 0..3 {
         for column_idx in 0..3 {
@@ -76,9 +76,8 @@ fn send_bases(coeffs_count: i32, ck: &CommitterKey<Bls12_381>) {
 
 fn run_composer(
     prover: &mut Prover<Fr, EdwardsParameters, KZG10<Bls12_381>>,
-    circuit: &mut MerkleTreeCircuit,
 ) {
-    let mut cs = prover.mut_cs();
+    let cs = prover.mut_cs();
 
     let hash_vars = cs.get_vars();
     let mut vars = Vec::with_capacity(hash_vars.len());
@@ -98,9 +97,6 @@ fn run_composer(
             cs.get_vars().len() as u64,
         );
     }
-
-    //TODO: this call only for set sizes
-    circuit.gadget(cs).unwrap();
 }
 
 fn main() {
@@ -134,46 +130,55 @@ fn main() {
         real_circuits.push(real_circuit);
     }
 
+    let coeffs_count = 1 << (HEIGHT + 7);
+    let padded_circuit_size = real_circuits[0].padded_circuit_size();
+    let (ck, _) = <KZG10<Bls12_381>>::trim(
+        &pp,
+        padded_circuit_size,
+        0,
+        None,
+    )
+        .unwrap();
+
+    let mut prover = Prover::<Fr, EdwardsParameters, KZG10<Bls12_381>>::new(
+        b"Merkle tree",
+    );
+    prover.prover_key = Some(pk);
+
     // proof generation
     let now = std::time::Instant::now();
     println!("==============================");
     println!("Start generating {} proofs", REPEAT);
-    let mut proof_and_pi_s = vec![];
+    let mut proof_and_pi_s = Vec::with_capacity(4);
+    let mut overall_real_prove_time = std::time::Duration::ZERO;
     for i in 0..REPEAT {
         let mut circuit = &mut real_circuits[i];
-
-        let coeffs_count = 1 << (HEIGHT + 7);
-        let (ck, _) = <KZG10<Bls12_381>>::trim(
-            &pp,
-            circuit.padded_circuit_size(),
-            0,
-            None,
-        )
-        .unwrap();
 
         send_bases(coeffs_count, &ck);
         send_merkle_tree(circuit);
 
-        let mut prover = Prover::<Fr, EdwardsParameters, KZG10<Bls12_381>>::new(
-            b"Merkle tree",
-        );
-        prover.prover_key = Some(pk.clone());
         prover.copy_data(coeffs_count);
+        run_composer(&mut prover);
 
-        run_composer(&mut prover, &mut circuit);
+        let real_prove_time = std::time::Instant::now();
 
         let result = circuit
             .gen_proof::<KZG10<Bls12_381>, G1Affine>(&mut prover, &ck, None)
             .unwrap();
-
         proof_and_pi_s.push(result);
+        overall_real_prove_time += real_prove_time.elapsed();
+
         println!("Proof {} is generated", i);
         println!("Time elapsed: {:?}", now.elapsed());
     }
     println!("The total prove generation time is {:?}", now.elapsed());
     println!(
-        "Aromatized cost for each proof is {:?}",
+        "Amortized cost for each proof is {:?}",
         now.elapsed() / REPEAT as u32
+    );
+    println!(
+        "Real amortized cost for each proof is {:?} msec",
+        overall_real_prove_time.as_millis() / REPEAT as u128
     );
     println!("==============================");
 
@@ -195,7 +200,7 @@ fn main() {
     }
     println!("The prove verification time is {:?}", now.elapsed());
     println!(
-        "Aromatized cost for each proof is {:?}",
+        "Amortized cost for each proof is {:?}",
         now.elapsed() / REPEAT as u32
     );
     println!("==============================");
