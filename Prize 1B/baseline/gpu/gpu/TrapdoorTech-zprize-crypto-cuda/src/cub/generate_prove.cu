@@ -694,6 +694,8 @@ extern "C" void init_bases_and_data(const void* bases, const int count)
     msm_call = 0;
     setenv("CUDA_MODULE_LOADING", "EAGER", false);
 
+    SAFE_CALL(cudaDeviceReset());
+
     execSt1 = execSt2 = execSt3 = execSt4 = execSt5 = 0;
     SAFE_CALL(cudaStreamCreate(&execSt1));
     SAFE_CALL(cudaStreamCreate(&execSt2));
