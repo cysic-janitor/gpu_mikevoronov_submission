@@ -78,14 +78,18 @@ fn main() {
         
         // preprocessing
         let (pk, (vk, _pi_pos)) = dummy_circuit.compile::<KZG10<Bls12_381>>(&pp).unwrap();
+        let mut prover = Prover::<Fr, EdwardsParameters, KZG10<Bls12_381>>::new(b"Merkle tree");
 
+        let coeffs_count = 1 << (HEIGHT + 7);
+        prover.prover_key = Some(pk.clone());
+        prover.register_data(coeffs_count as i32);
+        
         // proof generation
         for i in 0..4 {
             let leaf_nodes = (0..1 << (HEIGHT - 1)).map(|_| Fr::rand(&mut rng)).collect::<Vec<_>>();
             let tree = MerkleTree::<NativeSpecRef<Fr>>::new_with_leaf_nodes(&param,&leaf_nodes);
             let mut real_circuit = MerkleTreeCircuit { param: param.clone(),merkle_tree: tree};
 
-            let coeffs_count = 1 << (HEIGHT + 7);
             let (ck, _) = <KZG10<Bls12_381>>::trim(&pp, real_circuit.padded_circuit_size(), 0, None).unwrap();
 
             let bases = ck.powers().powers_of_g.to_vec();
@@ -97,11 +101,8 @@ fn main() {
                        real_circuit.merkle_tree.non_leaf_nodes.as_ptr() as *const c_void, 
                        real_circuit.merkle_tree.leaf_nodes.as_ptr() as *const c_void);
             }
-            
-            let mut prover = Prover::<Fr, EdwardsParameters, KZG10<Bls12_381>>::new(b"Merkle tree");
 
-            prover.prover_key = Some(pk.clone());
-            prover.copy_data(coeffs_count as i32);
+            prover.copy_data();
             let mut cs = prover.mut_cs();
             
             let hash_vars = cs.get_vars();
