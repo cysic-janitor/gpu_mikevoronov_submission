@@ -615,8 +615,6 @@ where
     
     pub fn copy_data<'a, 'b, 'c>(&mut self)
     {
-        let prover_key = self.prover_key.as_ref().unwrap();
-                      
         unsafe { copyArrays(); }
     }
     

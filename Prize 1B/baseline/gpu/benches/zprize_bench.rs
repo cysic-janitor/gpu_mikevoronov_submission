@@ -144,6 +144,7 @@ fn main() {
         b"Merkle tree",
     );
     prover.prover_key = Some(pk);
+    prover.register_data(coeffs_count);
 
     // proof generation
     let now = std::time::Instant::now();
@@ -157,7 +158,7 @@ fn main() {
         send_bases(coeffs_count, &ck);
         send_merkle_tree(circuit);
 
-        prover.copy_data(coeffs_count);
+        prover.copy_data();
         run_composer(&mut prover);
 
         let real_prove_time = std::time::Instant::now();
