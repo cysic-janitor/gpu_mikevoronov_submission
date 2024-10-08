@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include <map>
+#include <set>
 #include <stack>
 
 template<typename T>
@@ -19,6 +20,8 @@ static std::map<int, int> counts;
 static std::map<int, int> minCounts;
 static bool debugPrint = false;
 
+static std::set<storage*> created;
+
 static storage* get_pool(const int N, bool with_zero = false)
 {
     auto it = pools.find(N);
@@ -33,7 +36,10 @@ static storage* get_pool(const int N, bool with_zero = false)
         counts[N]++;
         if (debugPrint)
             printf(" ==> get from pool %d with_zero %d\n", N, with_zero);
-        return get_device<storage>(N, with_zero);
+        auto pointer = get_device<storage>(N, with_zero);
+        created.insert(pointer);
+        //printf("added %p\n", pointer);
+        return pointer;
     }
     else 
     {
@@ -43,6 +49,7 @@ static storage* get_pool(const int N, bool with_zero = false)
         if (debugPrint)
             minCounts[N] = std::min(minCounts[N], (int)it->second.size());
         //printf(" == reuse from pool %d\n", N);
+        //printf("reuse %p\n", pointer);
         return pointer;
     }
 }
@@ -59,7 +66,17 @@ static void release_pool(storage* &pointer, const int N)
         exit(-1);
     }
     
+    if (created.find(pointer) == created.end()) {
+        //printf("err free %p\n", pointer);
+    }
+    else {
+        it->second.push(pointer);
+        pointer = nullptr;
+    }
+    //printf("free %p\n", pointer);
     //printf(" == release pool %d\n", N);
-    it->second.push(pointer);
-    pointer = nullptr;
+}
+
+static void clearPool() {
+    
 }

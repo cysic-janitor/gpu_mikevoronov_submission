@@ -18,11 +18,13 @@ fn main() {
         .flag("-std=c++17")
         .file("src/cub/cub.cu")
         .file("src/cub/generate_prove.cu")        
-        .object("src/cub/poseidon_hash.o")
+        .file("src/cub/poseidon_hash.cu")
         .object("src/cub/poly_functions.o")
         .object("../yarrid-gpu-msm/msm_yrrid.o")
         .object("../matter_gpu_msm/msm_matter.o")
         .compile("cub");
     println!("cargo:rerun-if-changed=src/cub.cu");
     println!("cargo:rerun-if-changed=src/generate_prove.cu");
+    
+    //.object("src/cub/poseidon_hash.o")
 }

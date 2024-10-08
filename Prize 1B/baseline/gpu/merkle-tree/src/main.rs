@@ -33,6 +33,9 @@ fn main() {
             matrix.push(param.mds_matrices.m.0[z][k]);
         }
     }
+    
+    unsafe { sync_hash_consts(param.full_rounds as u64, param.half_full_rounds as u64 , param.partial_rounds as u64, param.round_constants.len() as u64, 
+                              param.round_constants.as_ptr() as *const c_void, tag.as_ptr() as *const c_void, matrix.as_ptr() as *const c_void);}
 
     // ==============================
     // first we build a merkle tree
@@ -75,60 +78,64 @@ fn main() {
         
         // preprocessing
         let (pk, (vk, _pi_pos)) = dummy_circuit.compile::<KZG10<Bls12_381>>(&pp).unwrap();
-
+        
+        let mut provers = vec![];
         // proof generation
-        for i in 0..4 {
-        let leaf_nodes = (0..1 << (HEIGHT - 1)).map(|_| Fr::rand(&mut rng)).collect::<Vec<_>>();
-        let tree = MerkleTree::<NativeSpecRef<Fr>>::new_with_leaf_nodes(&param,&leaf_nodes);
-        let mut real_circuit = MerkleTreeCircuit { param: param.clone(),merkle_tree: tree};
+        for i in 0..1 {
+            let leaf_nodes = (0..1 << (HEIGHT - 1)).map(|_| Fr::rand(&mut rng)).collect::<Vec<_>>();
+            let tree = MerkleTree::<NativeSpecRef<Fr>>::new_with_leaf_nodes(&param,&leaf_nodes);
+            let mut real_circuit = MerkleTreeCircuit { param: param.clone(),merkle_tree: tree};
 
-        let coeffs_count = 1 << (HEIGHT + 7);
-        let (ck, _) = <KZG10<Bls12_381>>::trim(&pp, real_circuit.padded_circuit_size(), 0, None).unwrap();
+            let coeffs_count = 1 << (HEIGHT + 7);
+            let (ck, _) = <KZG10<Bls12_381>>::trim(&pp, real_circuit.padded_circuit_size(), 0, None).unwrap();
 
-        let bases = ck.powers().powers_of_g.to_vec();
-        let bases_no_infinity = bases.iter().map(G1AffineNoInfinity::from).collect::<Vec<_>>();
-        unsafe {            
-           init_bases_and_data(bases_no_infinity.as_ptr() as *const c_void, coeffs_count as i32);
-   sync_hash_consts(param.full_rounds as u64, param.half_full_rounds as u64 , param.partial_rounds as u64, param.round_constants.len() as u64, 
-                              param.round_constants.as_ptr() as *const c_void, tag.as_ptr() as *const c_void, matrix.as_ptr() as *const c_void);
-           sync_mt(HEIGHT as i32, 
-                   real_circuit.merkle_tree.non_leaf_nodes.as_ptr() as *const c_void, 
-                   real_circuit.merkle_tree.leaf_nodes.as_ptr() as *const c_void);
-        }
-        let mut prover = Prover::<Fr, EdwardsParameters, KZG10<Bls12_381>>::new(b"Merkle tree");
-        prover.prover_key = Some(pk.clone());
-        prover.copy_data(coeffs_count as i32);
-        let mut cs = prover.mut_cs();
-        
-        let hash_vars = cs.get_vars();
-        let mut vars : Vec<Fr> = vec![];
-        for i in (0..hash_vars.len()) {
-            vars.push(hash_vars[&cs.get_varib(i as usize)]);
-        }
+            let bases = ck.powers().powers_of_g.to_vec();
+            let bases_no_infinity = bases.iter().map(G1AffineNoInfinity::from).collect::<Vec<_>>();
+            unsafe {            
+               init_bases_and_data(bases_no_infinity.as_ptr() as *const c_void, coeffs_count as i32);
+                              
+               sync_mt(HEIGHT as i32, 
+                       real_circuit.merkle_tree.non_leaf_nodes.as_ptr() as *const c_void, 
+                       real_circuit.merkle_tree.leaf_nodes.as_ptr() as *const c_void);
+            }
+            
+            let mut prover = Prover::<Fr, EdwardsParameters, KZG10<Bls12_381>>::new(b"Merkle tree");
 
-        unsafe { sync_composer(HEIGHT as i32,
-                               cs.get_wl().as_ptr() as *const c_void,
-                               cs.get_wr().as_ptr() as *const c_void,
-                               cs.get_wo().as_ptr() as *const c_void,
-                               cs.get_w4().as_ptr() as *const c_void,
-                               cs.get_wl().len() as u64, 
-                               vars.as_ptr() as *const c_void, cs.get_vars().len() as u64); 
-        }
+            prover.prover_key = Some(pk.clone());
+            prover.copy_data(coeffs_count as i32);
+            let mut cs = prover.mut_cs();
+            
+            let hash_vars = cs.get_vars();
+            let mut vars : Vec<Fr> = vec![];
+            for i in (0..hash_vars.len()) {
+                vars.push(hash_vars[&cs.get_varib(i as usize)]);
+            }
+            //println!("  hash size {:?}", hash_vars.len());
+            unsafe { sync_composer(HEIGHT as i32,
+                                   cs.get_wl().as_ptr() as *const c_void,
+                                   cs.get_wr().as_ptr() as *const c_void,
+                                   cs.get_wo().as_ptr() as *const c_void,
+                                   cs.get_w4().as_ptr() as *const c_void,
+                                   cs.get_wl().len() as u64, 
+                                   vars.as_ptr() as *const c_void, cs.get_vars().len() as u64); 
+            }
 
-        real_circuit.gadget(cs);
+            //TODO: this call only for set sizes
+            real_circuit.gadget(cs);
 
-        println!("start gen proof");
-        let now = std::time::Instant::now();
-        
-        let (proof, pi) = {
-            real_circuit.gen_proof::<KZG10<Bls12_381>, G1Affine>(&pp, &pk, b"Merkle tree", &mut prover, &ck, None).unwrap()
-        };
-        println!("The prove generation time is {:?}", now.elapsed());
+            println!("start gen proof");
+            let now = std::time::Instant::now();
 
-        let verifier_data = VerifierData::new(vk.clone(), pi.clone());
-        let res = verify_proof::<Fr, EdwardsParameters, KZG10<Bls12_381>>(&pp, verifier_data.key.clone(), &proof, &verifier_data.pi, b"Merkle tree");
+            let (proof, pi) = {
+                real_circuit.gen_proof::<KZG10<Bls12_381>, G1Affine>(&pp, &pk, b"Merkle tree", &mut prover, &ck, None).unwrap()
+            };
+            println!("The prove generation time is {:?}", now.elapsed());
 
-        println!("proof is verified: {}", res.is_ok());
+            let verifier_data = VerifierData::new(vk.clone(), pi.clone());
+            let res = verify_proof::<Fr, EdwardsParameters, KZG10<Bls12_381>>(&pp, verifier_data.key.clone(), &proof, &verifier_data.pi, b"Merkle tree");
+
+            println!("proof is verified: {}", res.is_ok());
+            provers.push(prover);
         }
     }
 }

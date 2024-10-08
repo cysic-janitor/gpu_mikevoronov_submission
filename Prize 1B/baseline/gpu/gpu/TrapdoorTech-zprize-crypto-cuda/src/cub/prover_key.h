@@ -16,6 +16,21 @@ struct Arithmetic {
     storage* q_c[2] = { nullptr, nullptr };
     storage* q_arith[2] = { nullptr, nullptr };
 
+    void check() {
+       for (int z = 0; z < 2; ++z) {
+           if (q_m[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+           if (q_l[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+           if (q_r[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+           if (q_o[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+           if (q_4[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+           if (q_hl[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+           if (q_hr[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+           if (q_h4[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+           if (q_c[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+           if (q_arith[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+       }
+    }
+    
     void reg_host(const int N) {
         const int domN = 8 * N;
         
@@ -102,6 +117,16 @@ struct Permutation {
     storage* right_sigma[2] = { nullptr, nullptr };
     storage* out_sigma[2] = { nullptr, nullptr };
     storage* fourth_sigma[2] = { nullptr, nullptr };
+    
+    void check() {
+       if (linear_eval != nullptr) printf("not %d\n", __LINE__);
+       for (int z = 0; z < 2; ++z) {
+           if (left_sigma[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+           if (right_sigma[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+           if (out_sigma[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+           if (fourth_sigma[z] != nullptr) printf("not %d %d\n", z, __LINE__);
+       }
+    }
     
     void reg_host(const int N) {
         const int domN = 8 * N;
@@ -209,6 +234,13 @@ struct Prover_key {
         const int domN = 8 * N;
         release_pool(v_h, domN);
     }
+    
+    void check () {
+        if (v_h) printf("not %d\n", __LINE__);
+        
+        arith.check();
+        perm.check();
+    }
 };
 
 static Prover_key prover_host, prover_gpu;
@@ -250,7 +282,7 @@ extern "C" void
                          const void* prov_perm_right_sig_0,
                          const void* prov_perm_out_sig_0, 
                          const void* prov_perm_fourth_sig_0)
-{    
+{
     prover_host.N = N;
     prover_gpu.N = N;
     
@@ -300,7 +332,7 @@ extern "C" void
     prover_host.perm.fourth_sigma[0] = (storage*)prov_perm_fourth_sig_0;
     prover_host.perm.fourth_sigma[1] = (storage*)prov_perm_fourth_sig_1;
     
-    prover_host.reg_host();
+    //prover_host.reg_host();
 }
    
 extern "C" void copyArrays ()

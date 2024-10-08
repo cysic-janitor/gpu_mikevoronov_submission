@@ -146,7 +146,7 @@ struct StandardComposer {
     
     StandardComposer(int N, size_t* wl, size_t* wr, size_t* wo, size_t* w4, size_t len,
                      const fd_q::storage* vars, size_t varsLen) {
-        with_expected_size(N);
+        with_expected_size(2*N);
                 
         for (size_t z = 0; z < len; ++z) {
             w_l[z] = wl[z];
@@ -852,7 +852,7 @@ extern "C" void build_constraints() {
 void* build_constraints_on_gpu(void *wl, void *wr, void *wo, void *w4, cudaStream_t st) {
     mt->gen_constraints_gpu(*composer_gpu, *hash_param_gpu, st);
     mt->copy_scalars(*composer_gpu, *hash_param, (fd_q::storage*)wl, (fd_q::storage*)wr, (fd_q::storage*)wo, (fd_q::storage*)w4, st);
-    
+
     return composer_gpu->public_inputs;
 }
 

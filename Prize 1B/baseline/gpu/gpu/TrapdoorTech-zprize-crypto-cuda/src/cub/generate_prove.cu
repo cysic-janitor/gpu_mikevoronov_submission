@@ -313,7 +313,8 @@ extern "C" {
         SAFE_CALL(cudaStreamSynchronize(execSt2));
         
         release_pool(gpu_tmp_buffer, domN);
-        release_pool(gpu_pi_poly, N);
+        //TODO: need to find true pointer!
+        //release_pool(gpu_pi_poly, N);
 #if MSM_YRRID
 		release_pool(gpu_msm, N);		
 #endif
@@ -428,6 +429,10 @@ extern "C" {
         release_pool(gpu_omegas_inv8n, domN);
         release_pool(gpu_pq_inv8n, N);
         
+        release_pool(gpu_gate_constraints, domN);        
+        release_pool(gpu_permutation, domN);
+        release_pool(gpu_powers_inv, domN);
+
         SAFE_CALL(cudaStreamSynchronize(execSt1));
 
 #if MSM_YRRID
@@ -534,7 +539,7 @@ extern "C" {
         release_pool(gpu_buffer ,N);
         release_pool(powers, N);
         release_pool(powers_shift, N);
-        
+                
         storage* host_values = (storage*)values;
         host_values[0] = a_eval;
         host_values[1] = b_eval;
@@ -634,6 +639,23 @@ extern "C" {
         prover_gpu.perm.release_data(prover_gpu.N, 0);
         /*for (auto& elem : minCounts)
             printf("min counts %d => %d\n", elem.first, elem.second);*/
+        
+        release_pool(gpu_comb_aw, N);
+        release_pool(gpu_comb_aw1, N);
+        
+        release_pool(gpu_comb_sw, N);
+        release_pool(gpu_comb_sw1, N);
+        
+        release_pool(gpu_powers1, N);
+        release_pool(gpu_powers2, N);
+        
+        div = 1;
+        for (int z = 0; z < deep + 1; ++z) {
+            release_pool(gpu_tmp1[z], nextN / div);
+            release_pool(gpu_tmp2[z], nextN / div);
+            
+            div *= 2;
+        }
     }        
 }
 
@@ -690,12 +712,10 @@ static void do_msm(const std::vector<void*> &scalars_v, int call_num, cudaStream
 
 extern "C" void init_bases_and_data(const void* bases, const int count)
 {
-    
     msm_call = 0;
     setenv("CUDA_MODULE_LOADING", "EAGER", false);
-
-    SAFE_CALL(cudaDeviceReset());
-
+    
+    //TODO: add destroy
     execSt1 = execSt2 = execSt3 = execSt4 = execSt5 = 0;
     SAFE_CALL(cudaStreamCreate(&execSt1));
     SAFE_CALL(cudaStreamCreate(&execSt2));
@@ -704,15 +724,23 @@ extern "C" void init_bases_and_data(const void* bases, const int count)
     SAFE_CALL(cudaStreamCreate(&execSt5));
     
 #if MSM_YRRID
-    MSMContextYrrid[0] = createContext(381, 1, count);
-    MSMContextYrrid[1] = createContext(381, 1, count);
+    if (MSMContextYrrid[0] == nullptr)
+        MSMContextYrrid[0] = createContext(381, 1, count);
+
+    if (MSMContextYrrid[1] == nullptr)
+        MSMContextYrrid[1] = createContext(381, 1, count);
     preprocessOnlyPoints(MSMContextYrrid[0], (void*)bases, count, nullptr);
     preprocessOnlyPoints(MSMContextYrrid[1], (void*)bases, count, MSMContextYrrid[0]);
     
-    SAFE_CALL(cudaMallocHost((void**)&msm_context.result_affine, sizeof(affine) * COMMITMENTS));
-    for (int z = 0; z < COMMITMENTS; ++z)
-        SAFE_CALL(cudaMallocHost((void**)&msm_context.result_tmp[z], sizeof(point_xyzz) * 4096));
+    if (msm_context.result_affine == nullptr) {
+        SAFE_CALL(cudaMallocHost((void**)&msm_context.result_affine, sizeof(affine) * COMMITMENTS));
+        for (int z = 0; z < COMMITMENTS; ++z)
+            SAFE_CALL(cudaMallocHost((void**)&msm_context.result_tmp[z], sizeof(point_xyzz) * 4096));
+    }
 #else
+    //TODO: allocations
+    //exit(-1);
+
     const int WINDOW_BITS_COUNT = 17;
     const int PRECOMPUTE_FACTOR = 8;
     const int WINDOWS_COUNT = (BLS_381_FR_MODULUS_BITS - 1) / WINDOW_BITS_COUNT + 1;
@@ -753,83 +781,135 @@ extern "C" void init_bases_and_data(const void* bases, const int count)
     if (execSt1 != execSt2)
         do_msm(vector<void*>{nullptr}, 0, execSt2, true);
 #endif   
-
-    SAFE_CALL(cudaMallocHost((void**)&pi_from_gpu, sizeof(storage) * count));	        
+    
+    bool first_alloc = (pi_from_gpu == nullptr);
+    if (first_alloc) {
+        //printf("FIRST ALLOC!!\n");
+        SAFE_CALL(cudaMallocHost((void**)&pi_from_gpu, sizeof(storage) * count));	        
    
-    const int count_data_N = 31;
-    const int count_data_N8 = 22;
-    // pre allocate memory
-    vector<storage*> p;
-    for (int z = 0; z < count_data_N; ++z)
-        p.push_back(get_pool(count, true));
-    
-    for (int z = 0; z < p.size(); ++z)
-        release_pool(p[z], count);
-    p.clear();
-    
-    for (int z = 0; z < count_data_N8; ++z)
-        p.push_back(get_pool(count * 8, true));
-
-    for (int z = 0; z < p.size(); ++z)
-        release_pool(p[z], count * 8);
-    p.clear();
-    
-    int spawn, spawn8, chunk_size, bucket_num;
-    setSizesForInverse(spawn, chunk_size, bucket_num, count);
-    auto tmp = get_pool(3 * spawn + 1, true);
-    release_pool(tmp, 3 * spawn + 1);
-    
-    setSizesForInverse(spawn8, chunk_size, bucket_num, count * 8);
-    if (spawn != spawn8) {
-        tmp = get_pool(3 * spawn8 + 1, true);
-        release_pool(tmp, 3 * spawn8 + 1);
-    }
-
-    alloc_bufs_for_scan(count);
-    alloc_bufs_for_scan(8 * count);
-    alloc_bufs_for_scan(spawn);
-    if (spawn != spawn8)
-        alloc_bufs_for_scan(spawn8);
-    alloc_bufs_for_scan(128); // for pq arrays
-
-    storage* tmp1 = get_pool(count, true); 
-    storage* tmp2 = get_pool(count, true); 
-    storage res;
-    evaluate_kernel(tmp1, tmp2, res, count, execSt1);
-    evaluate_kernel(tmp1, tmp2, res, count, execSt2);
-    evaluate_kernel(tmp1, tmp2, res, count, execSt3);
-
-    SAFE_CALL(cudaDeviceSynchronize());
-    
-    release_pool(tmp1, count);
-    release_pool(tmp2, count);
-    
-    {
-        int chunk_size, buckets_num, chunk_size1, deep;
-        setSizesForDivide(chunk_size, chunk_size1, buckets_num, deep, count);
-        const int nextN = count / chunk_size + 1;
+        const int count_data_N = 31;
+        const int count_data_N8 = 22;
+        // pre allocate memory
+        vector<storage*> p;
+        for (int z = 0; z < count_data_N; ++z)
+            p.push_back(get_pool(count, true));
         
-        std::vector<storage*> gpu_tmp1;
-        std::vector<storage*> gpu_tmp2;
-        int div = 1;
-        for (int z = 0; z < deep + 1; ++z) {
-            gpu_tmp1.push_back(get_pool(nextN / div, true));
-            gpu_tmp2.push_back(get_pool(nextN / div, true));
+        for (int z = 0; z < p.size(); ++z)
+            release_pool(p[z], count);
+        p.clear();
+        
+        for (int z = 0; z < count_data_N8; ++z)
+            p.push_back(get_pool(count * 8, true));
+
+        for (int z = 0; z < p.size(); ++z)
+            release_pool(p[z], count * 8);
+        p.clear();
+        
+        int spawn, spawn8, chunk_size, bucket_num;
+        setSizesForInverse(spawn, chunk_size, bucket_num, count);
+        auto tmp = get_pool(3 * spawn + 1, true);
+        release_pool(tmp, 3 * spawn + 1);
+        
+        setSizesForInverse(spawn8, chunk_size, bucket_num, count * 8);
+        if (spawn != spawn8) {
+            tmp = get_pool(3 * spawn8 + 1, true);
+            release_pool(tmp, 3 * spawn8 + 1);
+        }
+
+        alloc_bufs_for_scan(count);
+        alloc_bufs_for_scan(8 * count);
+        alloc_bufs_for_scan(spawn);
+        if (spawn != spawn8)
+            alloc_bufs_for_scan(spawn8);
+        alloc_bufs_for_scan(128); // for pq arrays
+
+        storage* tmp1 = get_pool(count, true); 
+        storage* tmp2 = get_pool(count, true); 
+        storage res;
+        evaluate_kernel(tmp1, tmp2, res, count, execSt1);
+        evaluate_kernel(tmp1, tmp2, res, count, execSt2);
+        evaluate_kernel(tmp1, tmp2, res, count, execSt3);
+
+        SAFE_CALL(cudaDeviceSynchronize());
+        
+        release_pool(tmp1, count);
+        release_pool(tmp2, count);
+        
+        {
+            int chunk_size, buckets_num, chunk_size1, deep;
+            setSizesForDivide(chunk_size, chunk_size1, buckets_num, deep, count);
+            const int nextN = count / chunk_size + 1;
             
-            div *= 2;
+            std::vector<storage*> gpu_tmp1;
+            std::vector<storage*> gpu_tmp2;
+            int div = 1;
+            for (int z = 0; z < deep + 1; ++z) {
+                gpu_tmp1.push_back(get_pool(nextN / div, true));
+                gpu_tmp2.push_back(get_pool(nextN / div, true));
+                
+                div *= 2;
+            }
+            
+            div = 1;
+            for (int z = 0; z < deep + 1; ++z) {
+                release_pool(gpu_tmp1[z], nextN / div);
+                release_pool(gpu_tmp2[z], nextN / div);
+                
+                div *= 2;
+            }
         }
         
-        div = 1;
-        for (int z = 0; z < deep + 1; ++z) {
-            release_pool(gpu_tmp1[z], nextN / div);
-            release_pool(gpu_tmp2[z], nextN / div);
-            
-            div *= 2;
+        for (auto& elem : counts)
+            minCounts[elem.first] = elem.second;
+        
+        /*for (auto& elem : pools) {
+            printf("%d -> %d\n", elem.first, elem.second.size());
+        }*/
+    }
+    else {
+        const int N = count;
+        const int domN = count * 8;
+        prover_gpu.check();
+        
+        if (gpu_w_l_sc != nullptr) release_pool(gpu_w_l_sc, N);// printf("not %d\n", __LINE__);
+        if (gpu_w_r_sc != nullptr) release_pool(gpu_w_r_sc, N); //printf("not %d\n", __LINE__);
+        if (gpu_w_o_sc  != nullptr) release_pool(gpu_w_o_sc, N);//printf("not %d\n", __LINE__);
+        if (gpu_w_4_sc  != nullptr) release_pool(gpu_w_4_sc, N);//printf("not %d\n", __LINE__);
+
+        if (gpu_w_l_poly != nullptr) release_pool(gpu_w_l_poly, N);//printf("not %d\n", __LINE__);
+        if (gpu_w_r_poly != nullptr) release_pool(gpu_w_r_poly, N);//printf("not %d\n", __LINE__);
+        if (gpu_w_o_poly != nullptr) release_pool(gpu_w_o_poly, N);//printf("not %d\n", __LINE__);
+        if (gpu_w_4_poly != nullptr) release_pool(gpu_w_4_poly, N);//printf("not %d\n", __LINE__);
+
+        if (gpu_w_l_poly_ex != nullptr) printf("not %d\n", __LINE__);
+        if (gpu_w_r_poly_ex != nullptr) printf("not %d\n", __LINE__);
+        if (gpu_w_o_poly_ex != nullptr) printf("not %d\n", __LINE__);
+        if (gpu_w_4_poly_ex != nullptr) printf("not %d\n", __LINE__);
+
+        if (gpu_omegas != nullptr) printf("not %d\n", __LINE__);
+        if (gpu_omegas_8n != nullptr) printf("not %d\n", __LINE__);
+        if (gpu_omegas_inv != nullptr) printf("not %d\n", __LINE__);
+        if (gpu_omegas_inv8n != nullptr) printf("not %d\n", __LINE__);
+
+        if (gpu_pq != nullptr) printf("not %d\n", __LINE__);
+        if (gpu_pq_inv != nullptr) printf("not %d\n", __LINE__);
+        if (gpu_pq_8n != nullptr) printf("not %d\n", __LINE__);
+        if (gpu_pq_inv8n != nullptr) printf("not %d\n", __LINE__);
+
+        if (gpu_powers != nullptr) printf("not %d\n", __LINE__);
+        if (gpu_quotient != nullptr) release_pool(gpu_quotient, domN);//printf("not %d\n", __LINE__);
+        if (gpu_linear != nullptr) release_pool(gpu_linear, N);//printf("not %d\n", __LINE__);
+
+        //if (gpu_pi_poly != nullptr) printf("not %d\n", __LINE__);
+        if (gpu_pi_poly_ex != nullptr) release_pool(gpu_pi_poly_ex, domN);//printf("not %d\n", __LINE__);
+
+        //if (pi_from_gpu != nullptr) printf("not %d\n", __LINE__);
+        if (gpu_z_poly != nullptr) release_pool(gpu_z_poly, N);//printf("not %d\n", __LINE__);   
+        for (auto& elem : pools) {
+            if (elem.second.size() != counts[elem.first])
+                printf("%d -> %d %d\n", elem.first, elem.second.size(), counts[elem.first]);             
         }
     }
     
-    for (auto& elem : counts)
-        minCounts[elem.first] = elem.second;
-
     debugPrint = true;
 }

@@ -244,7 +244,7 @@ where
                                  omegas_inv_vec.as_ptr() as *const c_void,
                                  size_inv_vec.as_ptr() as *const c_void,
                                  domain.size() as i32);
-                                        
+                                      
                  start_compute_w_polys (omegas_vec.as_ptr() as *const c_void,
                                         omegas_inv_vec.as_ptr() as *const c_void,
                                         size_inv_vec.as_ptr() as *const c_void,
@@ -265,8 +265,7 @@ where
         
         let z_2_poly = DensePolynomial::from_coefficients_vec(vec![F::from(1_u64); 1]);
         let (z_2_poly_commit, _) = PC::commit(commit_key, &[label_polynomial!(z_2_poly)], None, None::<&MSMContext<'_, '_, G>>).map_err(to_pc_error::<F, PC>)?;
-
-
+                
         let pi_size = unsafe { calculate_pi_size(domain.size() as i32) };
         let pi_pos = vec![0 as usize; pi_size.try_into().unwrap()];
         let pi_items = vec![F::zero(); pi_size.try_into().unwrap()];
@@ -511,8 +510,7 @@ where
         
         let aw_proof = PC::get_proof::<G>(11);
         let sw_proof = PC::get_proof::<G>(12);
-
-        
+      
         Ok(Proof {
             a_comm: w_l.clone(),
             b_comm: w_r.clone(),
@@ -565,7 +563,6 @@ where
             msm_context,
             PhantomData::<PC>,
         )?;
-        
         //println!("  total prove = {:?}", start.elapsed());
         // Clear witness and reset composer variables
         //self.clear_witness();

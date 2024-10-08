@@ -26,12 +26,12 @@ struct MsmConfiguration {
         
 struct MSMContext {
     int log_count;
-    void *bases;
+    void *bases = nullptr;
     int window_bits_count;
     int precompute_factor;   
-    void* result;
-	void* result_affine;
-    void** result_tmp;
+    void* result = nullptr;
+	void* result_affine = nullptr;
+    void** result_tmp = nullptr;
     
     MSMContext(int comms) {
         result_tmp = new void*[comms];
