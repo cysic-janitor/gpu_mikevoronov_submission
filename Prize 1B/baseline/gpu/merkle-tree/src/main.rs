@@ -78,10 +78,9 @@ fn main() {
         
         // preprocessing
         let (pk, (vk, _pi_pos)) = dummy_circuit.compile::<KZG10<Bls12_381>>(&pp).unwrap();
-        
-        let mut provers = vec![];
+
         // proof generation
-        for i in 0..1 {
+        for i in 0..4 {
             let leaf_nodes = (0..1 << (HEIGHT - 1)).map(|_| Fr::rand(&mut rng)).collect::<Vec<_>>();
             let tree = MerkleTree::<NativeSpecRef<Fr>>::new_with_leaf_nodes(&param,&leaf_nodes);
             let mut real_circuit = MerkleTreeCircuit { param: param.clone(),merkle_tree: tree};
@@ -135,7 +134,6 @@ fn main() {
             let res = verify_proof::<Fr, EdwardsParameters, KZG10<Bls12_381>>(&pp, verifier_data.key.clone(), &proof, &verifier_data.pi, b"Merkle tree");
 
             println!("proof is verified: {}", res.is_ok());
-            provers.push(prover);
         }
     }
 }

@@ -253,11 +253,21 @@ int32_t preprocessOnlyPoints(void* contextPtr, void* pointData, uint32_t pointCo
     if(batch->reduceMemory!=NULL)
     CUDA_CHECK(cudaFree(batch->reduceMemory));
     batch->reduceMemory=NULL;
-
+        
 	if (batchPre == nullptr) {
+       // printf("call first\n");
 		CUDA_CHECK(cudaStreamCreate(&stream));
+        
+        if (batch->scaledPointMemory != NULL) {
+            CUDA_CHECK(cudaFree(batch->scaledPointMemory));    
+            //printf("free\n");
+        }
 		CUDA_CHECK(cudaMalloc(&batch->scaledPointMemory, batch->pointBytesRequired()));
+        
+        if (batch->pointMemory != NULL)
+            CUDA_CHECK(cudaFree(batch->pointMemory));            
 		CUDA_CHECK(cudaMalloc(&batch->pointMemory, 96*pointCount));
+        
 		CUDA_CHECK(cudaMemcpy(batch->pointMemory, pointData, 96*pointCount, cudaMemcpyHostToDevice));
 		CUDA_CHECK(batch->runPointPrecompute(stream, batch->scaledPointMemory, batch->pointMemory, pointCount));
 		CUDA_CHECK(cudaStreamDestroy(stream));
@@ -270,7 +280,7 @@ int32_t preprocessOnlyPoints(void* contextPtr, void* pointData, uint32_t pointCo
 		batch->scaledPointMemory = batchPre->scaledPointMemory;
 	}
 
-    // reallocate the required scalar memory and planning memory
+    // reallocate the required scalar memory and planning memory    
     CUDA_CHECK(cudaMalloc(&batch->planningMemory, batch->planningBytesRequired()));
     CUDA_CHECK(cudaMalloc(&batch->bucketMemory, batch->bucketBytesRequired()));
     CUDA_CHECK(cudaMalloc(&batch->reduceMemory, batch->maxBatchCount*batch->reduceBytesRequired()));

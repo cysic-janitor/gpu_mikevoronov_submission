@@ -313,8 +313,7 @@ extern "C" {
         SAFE_CALL(cudaStreamSynchronize(execSt2));
         
         release_pool(gpu_tmp_buffer, domN);
-        //TODO: need to find true pointer!
-        //release_pool(gpu_pi_poly, N);
+        release_pool(gpu_pi_poly, N);
 #if MSM_YRRID
 		release_pool(gpu_msm, N);		
 #endif
@@ -717,11 +716,11 @@ extern "C" void init_bases_and_data(const void* bases, const int count)
     
     //TODO: add destroy
     execSt1 = execSt2 = execSt3 = execSt4 = execSt5 = 0;
-    SAFE_CALL(cudaStreamCreate(&execSt1));
+    /*SAFE_CALL(cudaStreamCreate(&execSt1));
     SAFE_CALL(cudaStreamCreate(&execSt2));
     SAFE_CALL(cudaStreamCreate(&execSt3));
     SAFE_CALL(cudaStreamCreate(&execSt4));
-    SAFE_CALL(cudaStreamCreate(&execSt5));
+    SAFE_CALL(cudaStreamCreate(&execSt5));*/
     
 #if MSM_YRRID
     if (MSMContextYrrid[0] == nullptr)
@@ -783,6 +782,7 @@ extern "C" void init_bases_and_data(const void* bases, const int count)
 #endif   
     
     bool first_alloc = (pi_from_gpu == nullptr);
+    pi.clear();
     if (first_alloc) {
         //printf("FIRST ALLOC!!\n");
         SAFE_CALL(cudaMallocHost((void**)&pi_from_gpu, sizeof(storage) * count));	        
@@ -900,14 +900,26 @@ extern "C" void init_bases_and_data(const void* bases, const int count)
         if (gpu_quotient != nullptr) release_pool(gpu_quotient, domN);//printf("not %d\n", __LINE__);
         if (gpu_linear != nullptr) release_pool(gpu_linear, N);//printf("not %d\n", __LINE__);
 
-        //if (gpu_pi_poly != nullptr) printf("not %d\n", __LINE__);
+        if (gpu_pi_poly != nullptr) release_pool(gpu_pi_poly, N);//printf("not %d\n", __LINE__);
         if (gpu_pi_poly_ex != nullptr) release_pool(gpu_pi_poly_ex, domN);//printf("not %d\n", __LINE__);
 
         //if (pi_from_gpu != nullptr) printf("not %d\n", __LINE__);
         if (gpu_z_poly != nullptr) release_pool(gpu_z_poly, N);//printf("not %d\n", __LINE__);   
         for (auto& elem : pools) {
-            if (elem.second.size() != counts[elem.first])
-                printf("%d -> %d %d\n", elem.first, elem.second.size(), counts[elem.first]);             
+            if (elem.second.size() != counts[elem.first]) {
+                //printf("%d -> %d %d\n", elem.first, elem.second.size(), counts[elem.first]);
+                
+                while (elem.second.size())
+                    elem.second.pop();
+                
+                for (auto& pp : created[elem.first])
+                    elem.second.push(pp);
+                
+                printf("%d -> %d %d\n", elem.first, elem.second.size(), counts[elem.first]);
+            }
+
+            for (auto& pp : created[elem.first])
+               SAFE_CALL(cudaMemset(pp, 0, sizeof(storage) * elem.first));
         }
     }
     

@@ -97,20 +97,23 @@ struct ArithmeticGate {
             has_pi = 0;
     }
 };
-    
+
+extern fd_q::storage* get_pool(const int N, bool with_zero = false);
+
 struct StandardComposer {
     /// Number of arithmetic gates in the circuit
     //size_t total = 0;
     size_t last_key;
     size_t last_gate;
+    bool isGpu = false;
     
     fd_q::storage* public_inputs;
     
     // Witness vectors
-    size_t* w_l;
-    size_t* w_r;
-    size_t* w_o;
-    size_t* w_4;
+    size_t* w_l = NULL;
+    size_t* w_r = NULL;
+    size_t* w_o = NULL;
+    size_t* w_4 = NULL;
 
     size_t zero_var = 0;
     fd_q::storage* variables;
@@ -164,6 +167,8 @@ struct StandardComposer {
     
     //for GPU
     StandardComposer(int N, const StandardComposer& host) {
+        isGpu = true;
+        
         SAFE_CALL(cudaMalloc((void**)&w_l, sizeof(size_t) * N));
         SAFE_CALL(cudaMalloc((void**)&w_r, sizeof(size_t) * N));
         SAFE_CALL(cudaMalloc((void**)&w_o, sizeof(size_t) * N));
@@ -171,6 +176,8 @@ struct StandardComposer {
         
         SAFE_CALL(cudaMalloc((void**)&public_inputs, sizeof(fd_q::storage) * N));
         SAFE_CALL(cudaMemset(public_inputs, 0, sizeof(fd_q::storage) * N));
+        
+        //public_inputs = get_pool(N, true);
         
         SAFE_CALL(cudaMalloc((void**)&variables, sizeof(fd_q::storage) * 2 * N));
         
@@ -185,6 +192,18 @@ struct StandardComposer {
         SAFE_CALL(cudaMemcpy(variables, host.variables, sizeof(fd_q::storage) * host.last_key, cudaMemcpyHostToDevice));
     }
 
+    void clear() {
+        if (!isGpu)
+            return;
+        //printf("clear comp\n");
+        SAFE_CALL(cudaFree(w_l));
+        SAFE_CALL(cudaFree(w_r));
+        SAFE_CALL(cudaFree(w_o));
+        SAFE_CALL(cudaFree(w_4));
+        SAFE_CALL(cudaFree(variables));
+        SAFE_CALL(cudaFree(public_inputs));
+    }
+    
     void with_expected_size(const size_t expected_size) {
         last_key = 0;
         last_gate = 0;
@@ -657,7 +676,7 @@ struct MerkleTree {
     size_t* leaf_node_vars_g;
 
     size_t HEIGHT;
-
+    
     MerkleTree(int H, const fd_q::storage* nl_nodes, const fd_q::storage* l_nodes) : HEIGHT(H) {
         int tt = 1 << (H - 1);
         leaf_nodes.resize(tt);
@@ -673,6 +692,12 @@ struct MerkleTree {
         SAFE_CALL(cudaMalloc((void**)&leaf_node_vars_g, sizeof(size_t) * tt));        
     }
 
+    void clear()
+    {
+        SAFE_CALL(cudaFree(non_leaf_node_vars_g));
+        SAFE_CALL(cudaFree(leaf_node_vars_g));
+    }
+    
     void sync_mt_gpu(StandardComposer& composer, cudaStream_t st = 0) {
         size_t last_k = composer.last_key;
         SAFE_CALL(cudaMemcpyAsync(composer.variables + composer.last_key, leaf_nodes.data(), sizeof(fd_q::storage) * leaf_nodes.size(), cudaMemcpyHostToDevice, st));
@@ -801,11 +826,17 @@ extern "C" void sync_composer(int H, const void* wl, const void* wr, const void*
                               const void* vars, size_t varsLen) {
     composer = new StandardComposer(1 << (H + 7), (size_t*)wl, (size_t*)wr, (size_t*)wo, (size_t*)w4, len, (const fd_q::storage*) vars, varsLen);
     
+    if (composer_gpu != NULL)
+        composer_gpu->clear();
+
     composer_gpu = new StandardComposer(1 << (H + 7), *composer);
     mt->sync_mt_gpu(*composer_gpu);
 }
 
 extern "C" void sync_mt(int H, const void* nl_nodes, const void* l_nodes) {
+    if (mt != NULL)
+        mt->clear();
+    
     mt = new MerkleTree(H, (const fd_q::storage*)nl_nodes, (const fd_q::storage*)l_nodes);
 }
 

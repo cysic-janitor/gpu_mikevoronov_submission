@@ -20,9 +20,9 @@ static std::map<int, int> counts;
 static std::map<int, int> minCounts;
 static bool debugPrint = false;
 
-static std::set<storage*> created;
+static std::map<int, std::set<storage*>> created;
 
-static storage* get_pool(const int N, bool with_zero = false)
+storage* get_pool(const int N, bool with_zero = false)
 {
     auto it = pools.find(N);
     
@@ -37,7 +37,7 @@ static storage* get_pool(const int N, bool with_zero = false)
         if (debugPrint)
             printf(" ==> get from pool %d with_zero %d\n", N, with_zero);
         auto pointer = get_device<storage>(N, with_zero);
-        created.insert(pointer);
+        created[N].insert(pointer);
         //printf("added %p\n", pointer);
         return pointer;
     }
@@ -66,7 +66,7 @@ static void release_pool(storage* &pointer, const int N)
         exit(-1);
     }
     
-    if (created.find(pointer) == created.end()) {
+    if (created[N].find(pointer) == created[N].end()) {
         //printf("err free %p\n", pointer);
     }
     else {
