@@ -9687,4 +9687,6 @@ extern "C" {
     pub fn calculate_pi_size(N: i32) -> i32;
     
     pub fn get_pi_pos(pos_: *mut c_void, items_: *mut c_void);
+    
+    pub fn getExpectedDomainSize() -> i32;
 }

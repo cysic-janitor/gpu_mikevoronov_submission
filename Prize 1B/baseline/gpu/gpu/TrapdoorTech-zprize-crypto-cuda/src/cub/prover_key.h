@@ -246,6 +246,9 @@ struct Prover_key {
 static Prover_key prover_host, prover_gpu;
 static Permutation perm_gpu;
 
+extern "C" int getExpectedDomainSize() {
+    return prover_host.N;
+}     
 extern "C" void 
      registerAllArrays  (const int N,
                          const void* prov_v_h, 

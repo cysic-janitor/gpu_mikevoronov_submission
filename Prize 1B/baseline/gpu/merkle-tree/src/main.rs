@@ -119,9 +119,6 @@ fn main() {
                                    vars.as_ptr() as *const c_void, cs.get_vars().len() as u64); 
             }
 
-            //TODO: this call only for set sizes
-            real_circuit.gadget(cs);
-
             println!("start gen proof");
             let now = std::time::Instant::now();
 
