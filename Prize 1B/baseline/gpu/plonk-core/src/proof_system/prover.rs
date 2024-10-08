@@ -571,7 +571,7 @@ where
         Ok(proof)
     }
     
-    pub fn copy_data<'a, 'b, 'c>(&mut self, coeffs_count: i32)
+    pub fn register_data<'a, 'b, 'c>(&mut self, coeffs_count: i32)
     {
         let prover_key = self.prover_key.as_ref().unwrap();
                       
@@ -610,9 +610,14 @@ where
                       prover_key.permutation.right_sigma.0.coeffs.as_ptr() as *const c_void,
                       prover_key.permutation.out_sigma.0.coeffs.as_ptr() as *const c_void,
                       prover_key.permutation.fourth_sigma.0.coeffs.as_ptr() as *const c_void);
-
-           copyArrays();
         }
+    }
+    
+    pub fn copy_data<'a, 'b, 'c>(&mut self)
+    {
+        let prover_key = self.prover_key.as_ref().unwrap();
+                      
+        unsafe { copyArrays(); }
     }
     
 }

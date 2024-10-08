@@ -335,7 +335,7 @@ extern "C" void
     prover_host.perm.fourth_sigma[0] = (storage*)prov_perm_fourth_sig_0;
     prover_host.perm.fourth_sigma[1] = (storage*)prov_perm_fourth_sig_1;
     
-    //prover_host.reg_host();
+    prover_host.reg_host();
 }
    
 extern "C" void copyArrays ()
