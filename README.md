@@ -24,7 +24,7 @@ For the Merkle tree of height 15 the proving time of our solution is `762 ms` on
 ## The approach
 
 We highly optimized all the steps of proof and gadget generation:
- - all the measured gadget generation was moved to CUDA (`./Prize 1B/baseline/gpu/TrapdoorTech-zprize-crypto-cuda/src/cub/poseidon_hash.cu`)
+ - all the measured gadget generation (`./Prize 1B/baseline/gpu/TrapdoorTech-zprize-crypto-cuda/src/cub/poseidon_hash.cu`) and operation over polynomials (`./Prize 1B/baseline/gpu/TrapdoorTech-zprize-crypto-cuda/src/cub/poly_functions.cu`) were moved to CUDA
  - the solution works really carefully with CUDA memory and streams copying poly in the batch mode
  - the original solution used a lot of memory and computation efforts for parts in Garage library which aren't really used, e.g. lookup tables, they were optimized or removed
  - division for `x^n - 1` was optimized for GPU
