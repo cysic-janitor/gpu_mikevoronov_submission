@@ -33,8 +33,6 @@ fn main() {
             matrix.push(param.mds_matrices.m.0[z][k]);
         }
     }
-    unsafe { sync_hash_consts(param.full_rounds as u64, param.half_full_rounds as u64 , param.partial_rounds as u64, param.round_constants.len() as u64, 
-                              param.round_constants.as_ptr() as *const c_void, tag.as_ptr() as *const c_void, matrix.as_ptr() as *const c_void); }
 
     // ==============================
     // first we build a merkle tree
@@ -79,6 +77,7 @@ fn main() {
         let (pk, (vk, _pi_pos)) = dummy_circuit.compile::<KZG10<Bls12_381>>(&pp).unwrap();
 
         // proof generation
+        for i in 0..4 {
         let leaf_nodes = (0..1 << (HEIGHT - 1)).map(|_| Fr::rand(&mut rng)).collect::<Vec<_>>();
         let tree = MerkleTree::<NativeSpecRef<Fr>>::new_with_leaf_nodes(&param,&leaf_nodes);
         let mut real_circuit = MerkleTreeCircuit { param: param.clone(),merkle_tree: tree};
@@ -90,6 +89,8 @@ fn main() {
         let bases_no_infinity = bases.iter().map(G1AffineNoInfinity::from).collect::<Vec<_>>();
         unsafe {            
            init_bases_and_data(bases_no_infinity.as_ptr() as *const c_void, coeffs_count as i32);
+   sync_hash_consts(param.full_rounds as u64, param.half_full_rounds as u64 , param.partial_rounds as u64, param.round_constants.len() as u64, 
+                              param.round_constants.as_ptr() as *const c_void, tag.as_ptr() as *const c_void, matrix.as_ptr() as *const c_void);
            sync_mt(HEIGHT as i32, 
                    real_circuit.merkle_tree.non_leaf_nodes.as_ptr() as *const c_void, 
                    real_circuit.merkle_tree.leaf_nodes.as_ptr() as *const c_void);
@@ -124,9 +125,10 @@ fn main() {
         };
         println!("The prove generation time is {:?}", now.elapsed());
 
-        let verifier_data = VerifierData::new(vk, pi.clone());
+        let verifier_data = VerifierData::new(vk.clone(), pi.clone());
         let res = verify_proof::<Fr, EdwardsParameters, KZG10<Bls12_381>>(&pp, verifier_data.key.clone(), &proof, &verifier_data.pi, b"Merkle tree");
 
         println!("proof is verified: {}", res.is_ok());
+        }
     }
 }
