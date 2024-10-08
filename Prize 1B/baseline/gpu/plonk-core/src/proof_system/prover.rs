@@ -205,10 +205,11 @@ where
     where
         G: AffineCurve,
     {
-        //TODO: need to calculate circuit_bound using PoseidonConstants
+        let expectedDomainSize = unsafe { getExpectedDomainSize() };
+
         let domain =
-            GeneralEvaluationDomain::new(self.cs.circuit_bound()).ok_or(Error::InvalidEvalDomainSize {
-                log_size_of_group: self.cs.circuit_bound().trailing_zeros(),
+            GeneralEvaluationDomain::new(expectedDomainSize as usize).ok_or(Error::InvalidEvalDomainSize {
+                log_size_of_group: expectedDomainSize as u32,
                 adicity: <<F as ark_ff::FftField>::FftParams as ark_ff::FftParameters>::TWO_ADICITY,
             })?;
 
