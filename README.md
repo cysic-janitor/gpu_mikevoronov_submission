@@ -63,7 +63,7 @@ Current benchmark is almost the same as the original except that prover is creat
 
 Additionally, the benchmark also shows "real" proving time which is a measurement of the proof generation without any preparation work.
 
-## The approach
+## Description
 
 We highly optimized all the steps of proof and gadget generations:
  - all the measured [gadget generation operations](./zprize-2024-prize-1B/Prize 1B/baseline/gpu/TrapdoorTech-zprize-crypto-cuda/src/cub/poseidon_hash.cu) and [operations over polynomials](./zprize-2024-prize-1B/Prize 1B/baseline/gpu/TrapdoorTech-zprize-crypto-cuda/src/cub/poly_functions.cu) were moved to CUDA
