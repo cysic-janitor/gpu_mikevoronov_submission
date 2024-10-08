@@ -265,9 +265,6 @@ where
     /// [`crate::proof_system::Proof`] and the [`PublicInputs`].
     fn gen_proof<'a, 'b, PC, G>(
         &mut self,
-        u_params: &PC::UniversalParams,
-        prover_key: &ProverKey<F>,
-        transcript_init: &'static [u8],
         prover: &mut Prover<F, P, PC>,
         ck: &PC::CommitterKey,
         msm_context : Option<&MSMContext<'a, 'b, G>>,
@@ -278,14 +275,9 @@ where
         PC: HomomorphicCommitment<F>,
         G: AffineCurve,
     {
-        let now = std::time::Instant::now();
-        let circuit_size = self.padded_circuit_size();
-        //let (ck, _) = PC::trim(u_params, circuit_size, 0, None).map_err(to_pc_error::<F, PC>)?;        
-        //self.gadget(prover.mut_cs());        
-        //println!("  trim {:?}", now.elapsed());
         let prov = prover.prove(&ck, msm_context)?;
         let pi = prover.cs.get_pi().clone();
-        //println!("  full {:?}", now.elapsed());
+
         Ok((prov, pi))
     }
 

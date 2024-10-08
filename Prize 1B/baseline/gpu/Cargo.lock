@@ -1590,6 +1590,7 @@ dependencies = [
  "derivative",
  "ec-gpu-common",
  "lazy_static",
+ "merkle-tree",
  "paste",
  "plonk-core",
  "plonk-hashing",
