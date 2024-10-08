@@ -124,7 +124,7 @@ fn main() {
             let now = std::time::Instant::now();
 
             let (proof, pi) = {
-                real_circuit.gen_proof::<KZG10<Bls12_381>, G1Affine>(&pp, &pk, b"Merkle tree", &mut prover, &ck, None).unwrap()
+                real_circuit.gen_proof::<KZG10<Bls12_381>, G1Affine>(&mut prover, &ck, None).unwrap()
             };
             println!("The prove generation time is {:?}", now.elapsed());
 
