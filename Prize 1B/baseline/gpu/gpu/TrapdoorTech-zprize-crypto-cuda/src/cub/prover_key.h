@@ -54,7 +54,8 @@ struct Arithmetic {
 
         for (int z = 0; z < 2; ++z) {
             //q_m[z] = get_pool(sizes[z]);
-            q_l[z] = get_pool(sizes[z]);
+            
+            /*q_l[z] = get_pool(sizes[z]);
             q_r[z] = get_pool(sizes[z]);
             q_o[z] = get_pool(sizes[z]);
             q_4[z] = get_pool(sizes[z]);
@@ -62,11 +63,22 @@ struct Arithmetic {
             q_hr[z] = get_pool(sizes[z]);
             q_h4[z] = get_pool(sizes[z]);
             q_c[z] = get_pool(sizes[z]);
-            q_arith[z] = get_pool(sizes[z]);
+            q_arith[z] = get_pool(sizes[z]);*/
+            
+            q_l[z] = get_device<storage>(sizes[z]);
+            q_r[z] = get_device<storage>(sizes[z]);
+            q_o[z] = get_device<storage>(sizes[z]);
+            q_4[z] = get_device<storage>(sizes[z]);
+            q_hl[z] = get_device<storage>(sizes[z]);
+            q_hr[z] = get_device<storage>(sizes[z]);
+            q_h4[z] = get_device<storage>(sizes[z]);
+            q_c[z] = get_device<storage>(sizes[z]);
+            q_arith[z] = get_device<storage>(sizes[z]);
         }
     }
 
     void release_data(const int N, const int elem) {
+        return;
         const int domN = 8 * N;
         const int sizes[2] = { N, domN };
         
@@ -152,19 +164,26 @@ struct Permutation {
         const int domN = 8 * N;
         const int sizes[2] = { N, domN };
         
-        linear_eval = get_pool(domN);
+        //linear_eval = get_pool(domN);
+        linear_eval = get_device<storage>(domN);
         for (int z = 0; z < 2; ++z)
             allocate_sigma(sizes[z], z);
     }
 
     void allocate_sigma(const int N, const int elem) {
-        left_sigma[elem] = get_pool(N);
+        /*left_sigma[elem] = get_pool(N);
         right_sigma[elem] = get_pool(N);
         out_sigma[elem] = get_pool(N);
-        fourth_sigma[elem] = get_pool(N);
+        fourth_sigma[elem] = get_pool(N);*/
+        
+        left_sigma[elem] = get_device<storage>(N);
+        right_sigma[elem] = get_device<storage>(N);
+        out_sigma[elem] = get_device<storage>(N);
+        fourth_sigma[elem] = get_device<storage>(N);
     }
     
     void release_data(const int N, const int elem) {
+        return;
         const int domN = 8 * N;
         const int sizes[2] = { N, domN };
         
@@ -224,13 +243,15 @@ struct Prover_key {
         if (N == 0) 
             return;
         const int domN = 8 * N;
-        v_h = get_pool(domN);
+        //v_h = get_pool(domN);
+        v_h = get_device<storage>(domN);
         
         arith.allocate_data(N);
         perm.allocate_data(N);
     }
     
     void release_data() {
+        return;
         const int domN = 8 * N;
         release_pool(v_h, domN);
     }

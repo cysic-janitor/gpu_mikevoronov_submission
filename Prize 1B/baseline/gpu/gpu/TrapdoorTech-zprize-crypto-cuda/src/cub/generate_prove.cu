@@ -87,6 +87,7 @@ static void inverse_poly(storage* gpu_poly, int N, cudaStream_t st = 0)
 
     storage* gpu_tmp_inv = get_pool(3 * spawn + 1);
     storage* gpu_buckects = get_pool(N);
+    
     invesion_kernel(gpu_poly, gpu_tmp_inv, gpu_buckects, spawn, gws, lws, chunk_size, bucket_num, N, st);
     release_pool(gpu_tmp_inv, 3 * spawn + 1);
     release_pool(gpu_buckects, N);
@@ -382,7 +383,8 @@ extern "C" {
         release_pool(gpu_pq_8n, N);
         release_pool(gpu_powers, N);
 
-        inverse_poly(prover_gpu.v_h, domN, execSt1);
+        storage* gpu_v_h_inv = get_pool(domN);
+        duplicate(gpu_v_h_inv, prover_gpu.v_h, domN, execSt1);
 
         storage* gpu_permutation = get_pool(domN);
         compute_permutation_kernel   (gpu_permutation,
@@ -413,9 +415,11 @@ extern "C" {
         release_pool(gpu_w_4_poly_ex, domN);
         
         release_pool(gpu_z_poly_ex, domN);
+
+        inverse_poly(gpu_v_h_inv, domN, execSt1);
         
         gpu_quotient = get_pool(domN);
-        compute_quotient_kernel(gpu_quotient, gpu_gate_constraints, gpu_permutation, prover_gpu.v_h, domN, execSt1);
+        compute_quotient_kernel(gpu_quotient, gpu_gate_constraints, gpu_permutation, gpu_v_h_inv, domN, execSt1);
         
         prover_gpu.release_data();
 
@@ -431,7 +435,8 @@ extern "C" {
         release_pool(gpu_gate_constraints, domN);        
         release_pool(gpu_permutation, domN);
         release_pool(gpu_powers_inv, domN);
-
+        release_pool(gpu_v_h_inv, domN);
+        
         SAFE_CALL(cudaStreamSynchronize(execSt1));
 
 #if MSM_YRRID
@@ -791,8 +796,8 @@ extern "C" void init_data(const int count)
         //printf("FIRST ALLOC!!\n");
         SAFE_CALL(cudaMallocHost((void**)&pi_from_gpu, sizeof(storage) * count));	        
    
-        const int count_data_N = 31;
-        const int count_data_N8 = 22;
+        const int count_data_N = 31-11;
+        const int count_data_N8 = 22-12;
         // pre allocate memory
         vector<storage*> p;
         for (int z = 0; z < count_data_N; ++z)
@@ -873,7 +878,7 @@ extern "C" void init_data(const int count)
     else {
         const int N = count;
         const int domN = count * 8;
-        prover_gpu.check();
+        //prover_gpu.check();
         
         if (gpu_w_l_sc != nullptr) release_pool(gpu_w_l_sc, N);// printf("not %d\n", __LINE__);
         if (gpu_w_r_sc != nullptr) release_pool(gpu_w_r_sc, N); //printf("not %d\n", __LINE__);
@@ -919,11 +924,8 @@ extern "C" void init_data(const int count)
                 for (auto& pp : created[elem.first])
                     elem.second.push(pp);
                 
-                printf("%d -> %d %d\n", elem.first, elem.second.size(), counts[elem.first]);
+                //printf("%d -> %d %d\n", elem.first, elem.second.size(), counts[elem.first]);
             }
-
-            /*for (auto& pp : created[elem.first])
-               SAFE_CALL(cudaMemset(pp, 0, sizeof(storage) * elem.first));*/
         }
     }
     

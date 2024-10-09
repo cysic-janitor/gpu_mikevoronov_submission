@@ -90,6 +90,8 @@ fn main() {
         
         unsafe { init_bases(bases_no_infinity.as_ptr() as *const c_void, coeffs_count as i32); }
         
+        prover.copy_data();
+        
         // proof generation
         for i in 0..4 {
             let leaf_nodes = (0..1 << (HEIGHT - 1)).map(|_| Fr::rand(&mut rng)).collect::<Vec<_>>();
@@ -130,9 +132,9 @@ fn main() {
 
             println!("  sync comp {:?}", copy1.elapsed());
 
-            let copy1 = std::time::Instant::now();
+            /*let copy1 = std::time::Instant::now();
             prover.copy_data();
-            println!("  sync prover {:?}", copy1.elapsed());
+            println!("  sync prover {:?}", copy1.elapsed());*/
             
             println!("start gen proof - init time {:?}", copy.elapsed());
             let now = std::time::Instant::now();

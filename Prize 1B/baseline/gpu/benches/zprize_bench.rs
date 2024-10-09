@@ -151,7 +151,8 @@ fn main() {
     );
     prover.prover_key = Some(pk);
     prover.register_data(coeffs_count);
-
+    prover.copy_data();
+        
     send_bases(coeffs_count, &ck);
 
     // proof generation
@@ -166,8 +167,6 @@ fn main() {
         allocate_data(coeffs_count);
         send_merkle_tree(circuit);
         run_composer(&mut prover);
-
-        prover.copy_data();
 
         let real_prove_time = std::time::Instant::now();
 
