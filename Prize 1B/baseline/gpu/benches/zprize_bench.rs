@@ -74,7 +74,7 @@ fn send_bases(coeffs_count: i32, ck: &CommitterKey<Bls12_381>) {
     }
 }
 
-fn init_data(coeffs_count: i32) {
+fn allocate_data(coeffs_count: i32) {
     unsafe {
         init_data(coeffs_count);
     }
@@ -163,7 +163,7 @@ fn main() {
     for i in 0..REPEAT {
         let mut circuit = &mut real_circuits[i];
 
-        init_data(coeffs_count);
+        allocate_data(coeffs_count);
         send_merkle_tree(circuit);
         run_composer(&mut prover);
 
