@@ -149,7 +149,7 @@ struct StandardComposer {
     
     StandardComposer(int N, size_t* wl, size_t* wr, size_t* wo, size_t* w4, size_t len,
                      const fd_q::storage* vars, size_t varsLen) {
-        with_expected_size(2*N);
+        with_expected_size(N);
                 
         for (size_t z = 0; z < len; ++z) {
             w_l[z] = wl[z];
@@ -166,20 +166,24 @@ struct StandardComposer {
     }
     
     //for GPU
-    StandardComposer(int N, const StandardComposer& host) {
+    StandardComposer(const char *str) {
         isGpu = true;
+    }
+    
+    //TODO: check N
+    void copyFromHost(int N, const StandardComposer& host) {
+        if (w_l == NULL)
+        {
+            SAFE_CALL(cudaMalloc((void**)&w_l, sizeof(size_t) * N));
+            SAFE_CALL(cudaMalloc((void**)&w_r, sizeof(size_t) * N));
+            SAFE_CALL(cudaMalloc((void**)&w_o, sizeof(size_t) * N));
+            SAFE_CALL(cudaMalloc((void**)&w_4, sizeof(size_t) * N));
+            
+            SAFE_CALL(cudaMalloc((void**)&public_inputs, sizeof(fd_q::storage) * N));
+            SAFE_CALL(cudaMalloc((void**)&variables, sizeof(fd_q::storage) * 2 * N));
+        }
         
-        SAFE_CALL(cudaMalloc((void**)&w_l, sizeof(size_t) * N));
-        SAFE_CALL(cudaMalloc((void**)&w_r, sizeof(size_t) * N));
-        SAFE_CALL(cudaMalloc((void**)&w_o, sizeof(size_t) * N));
-        SAFE_CALL(cudaMalloc((void**)&w_4, sizeof(size_t) * N));
-        
-        SAFE_CALL(cudaMalloc((void**)&public_inputs, sizeof(fd_q::storage) * N));
         SAFE_CALL(cudaMemset(public_inputs, 0, sizeof(fd_q::storage) * N));
-        
-        //public_inputs = get_pool(N, true);
-        
-        SAFE_CALL(cudaMalloc((void**)&variables, sizeof(fd_q::storage) * 2 * N));
         
         last_key = host.last_key;
         last_gate = host.last_gate;
@@ -191,7 +195,7 @@ struct StandardComposer {
         
         SAFE_CALL(cudaMemcpy(variables, host.variables, sizeof(fd_q::storage) * host.last_key, cudaMemcpyHostToDevice));
     }
-
+    
     void clear() {
         if (!isGpu)
             return;
@@ -672,26 +676,41 @@ struct MerkleTree {
     std::vector<fd_q::storage> non_leaf_nodes;
     std::vector<fd_q::storage> leaf_nodes;
     
-    size_t* non_leaf_node_vars_g;
-    size_t* leaf_node_vars_g;
+    size_t* non_leaf_node_vars_g = NULL;
+    size_t* leaf_node_vars_g = NULL;
 
     size_t HEIGHT;
     
-    MerkleTree(int H, const fd_q::storage* nl_nodes, const fd_q::storage* l_nodes) : HEIGHT(H) {
+    MerkleTree(int H) : HEIGHT(H) 
+    {
+        
+    }
+
+    void init(int H, const fd_q::storage* nl_nodes, const fd_q::storage* l_nodes) 
+    {
         int tt = 1 << (H - 1);
-        leaf_nodes.resize(tt);
-        non_leaf_nodes.resize(tt - 1);
+        if (HEIGHT != H || leaf_nodes.size() == 0)
+        {
+            leaf_nodes.resize(tt);
+            non_leaf_nodes.resize(tt - 1);
+            
+            clear();
+            SAFE_CALL(cudaMalloc((void**)&non_leaf_node_vars_g, sizeof(size_t) * (tt - 1)));
+            SAFE_CALL(cudaMalloc((void**)&leaf_node_vars_g, sizeof(size_t) * tt)); 
+        }
+        else if (non_leaf_node_vars_g == NULL)
+        {
+            SAFE_CALL(cudaMalloc((void**)&non_leaf_node_vars_g, sizeof(size_t) * (tt - 1)));
+            SAFE_CALL(cudaMalloc((void**)&leaf_node_vars_g, sizeof(size_t) * tt)); 
+        }
         
         for (int z = 0; z < tt; ++z)
             leaf_nodes[z] = l_nodes[z];
         
         for (int z = 0; z < tt - 1; ++z)
             non_leaf_nodes[z] = nl_nodes[z];
-        
-        SAFE_CALL(cudaMalloc((void**)&non_leaf_node_vars_g, sizeof(size_t) * (tt - 1)));
-        SAFE_CALL(cudaMalloc((void**)&leaf_node_vars_g, sizeof(size_t) * tt));        
     }
-
+    
     void clear()
     {
         SAFE_CALL(cudaFree(non_leaf_node_vars_g));
@@ -826,18 +845,18 @@ extern "C" void sync_composer(int H, const void* wl, const void* wr, const void*
                               const void* vars, size_t varsLen) {
     composer = new StandardComposer(1 << (H + 7), (size_t*)wl, (size_t*)wr, (size_t*)wo, (size_t*)w4, len, (const fd_q::storage*) vars, varsLen);
     
-    if (composer_gpu != NULL)
-        composer_gpu->clear();
+    if (composer_gpu == NULL)
+        composer_gpu = new StandardComposer("gpu");
 
-    composer_gpu = new StandardComposer(1 << (H + 7), *composer);
+    composer_gpu->copyFromHost(1 << (H + 7), *composer);
     mt->sync_mt_gpu(*composer_gpu);
 }
 
 extern "C" void sync_mt(int H, const void* nl_nodes, const void* l_nodes) {
-    if (mt != NULL)
-        mt->clear();
+    if (mt == NULL)
+        mt = new MerkleTree(H);
     
-    mt = new MerkleTree(H, (const fd_q::storage*)nl_nodes, (const fd_q::storage*)l_nodes);
+    mt->init(H, (const fd_q::storage*)nl_nodes, (const fd_q::storage*)l_nodes);
 }
 
 extern "C" void build_constraints() {

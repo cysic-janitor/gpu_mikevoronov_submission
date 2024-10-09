@@ -9587,7 +9587,8 @@ use std::os::raw::c_void;
 use std::os::raw::c_int;
 
 extern "C" {
-   pub fn init_bases_and_data(bases: *const c_void, count: c_int);
+   pub fn init_bases(bases: *const c_void, count: c_int);
+   pub fn init_data(count: c_int);
     
    pub fn registerAllArrays(N : c_int,
                             prov_v_h: *const c_void,

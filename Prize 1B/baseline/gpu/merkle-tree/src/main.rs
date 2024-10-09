@@ -83,6 +83,12 @@ fn main() {
         let coeffs_count = 1 << (HEIGHT + 7);
         prover.prover_key = Some(pk.clone());
         prover.register_data(coeffs_count as i32);
+
+        let (ck, _) = <KZG10<Bls12_381>>::trim(&pp, coeffs_count, 0, None).unwrap();
+        let bases = ck.powers().powers_of_g.to_vec();
+        let bases_no_infinity = bases.iter().map(G1AffineNoInfinity::from).collect::<Vec<_>>();
+        
+        unsafe { init_bases(bases_no_infinity.as_ptr() as *const c_void, coeffs_count as i32); }
         
         // proof generation
         for i in 0..4 {
@@ -90,19 +96,20 @@ fn main() {
             let tree = MerkleTree::<NativeSpecRef<Fr>>::new_with_leaf_nodes(&param,&leaf_nodes);
             let mut real_circuit = MerkleTreeCircuit { param: param.clone(),merkle_tree: tree};
 
-            let (ck, _) = <KZG10<Bls12_381>>::trim(&pp, real_circuit.padded_circuit_size(), 0, None).unwrap();
+            let copy = std::time::Instant::now();
 
-            let bases = ck.powers().powers_of_g.to_vec();
-            let bases_no_infinity = bases.iter().map(G1AffineNoInfinity::from).collect::<Vec<_>>();
+            let copy1 = std::time::Instant::now();
             unsafe {            
-               init_bases_and_data(bases_no_infinity.as_ptr() as *const c_void, coeffs_count as i32);
-                              
+               init_data(coeffs_count as i32);
+               println!("  init data {:?}", copy1.elapsed());
+               
+               let copy1 = std::time::Instant::now();            
                sync_mt(HEIGHT as i32, 
                        real_circuit.merkle_tree.non_leaf_nodes.as_ptr() as *const c_void, 
                        real_circuit.merkle_tree.leaf_nodes.as_ptr() as *const c_void);
+               println!("  sync mt {:?}", copy1.elapsed());
             }
 
-            prover.copy_data();
             let mut cs = prover.mut_cs();
             
             let hash_vars = cs.get_vars();
@@ -111,6 +118,7 @@ fn main() {
                 vars.push(hash_vars[&cs.get_varib(i as usize)]);
             }
             //println!("  hash size {:?}", hash_vars.len());
+            let copy1 = std::time::Instant::now();
             unsafe { sync_composer(HEIGHT as i32,
                                    cs.get_wl().as_ptr() as *const c_void,
                                    cs.get_wr().as_ptr() as *const c_void,
@@ -120,7 +128,13 @@ fn main() {
                                    vars.as_ptr() as *const c_void, cs.get_vars().len() as u64); 
             }
 
-            println!("start gen proof");
+            println!("  sync comp {:?}", copy1.elapsed());
+
+            let copy1 = std::time::Instant::now();
+            prover.copy_data();
+            println!("  sync prover {:?}", copy1.elapsed());
+            
+            println!("start gen proof - init time {:?}", copy.elapsed());
             let now = std::time::Instant::now();
 
             let (proof, pi) = {

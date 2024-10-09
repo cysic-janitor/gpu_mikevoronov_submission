@@ -709,28 +709,19 @@ static void do_msm(const std::vector<void*> &scalars_v, int call_num, cudaStream
 }
 #endif
 
-extern "C" void init_bases_and_data(const void* bases, const int count)
+extern "C" void init_bases(const void* bases, const int count)
 {
-    msm_call = 0;
-    setenv("CUDA_MODULE_LOADING", "EAGER", false);
-    
-    //TODO: add destroy
-    execSt1 = execSt2 = execSt3 = execSt4 = execSt5 = 0;
-    /*SAFE_CALL(cudaStreamCreate(&execSt1));
-    SAFE_CALL(cudaStreamCreate(&execSt2));
-    SAFE_CALL(cudaStreamCreate(&execSt3));
-    SAFE_CALL(cudaStreamCreate(&execSt4));
-    SAFE_CALL(cudaStreamCreate(&execSt5));*/
-    
 #if MSM_YRRID
-    if (MSMContextYrrid[0] == nullptr)
+    if (MSMContextYrrid[0] == nullptr) {
         MSMContextYrrid[0] = createContext(381, 1, count);
+        preprocessOnlyPoints(MSMContextYrrid[0], (void*)bases, count, nullptr);
+    }
 
-    if (MSMContextYrrid[1] == nullptr)
+    if (MSMContextYrrid[1] == nullptr) {
         MSMContextYrrid[1] = createContext(381, 1, count);
-    preprocessOnlyPoints(MSMContextYrrid[0], (void*)bases, count, nullptr);
-    preprocessOnlyPoints(MSMContextYrrid[1], (void*)bases, count, MSMContextYrrid[0]);
-    
+        preprocessOnlyPoints(MSMContextYrrid[1], (void*)bases, count, MSMContextYrrid[0]);
+    }    
+
     if (msm_context.result_affine == nullptr) {
         SAFE_CALL(cudaMallocHost((void**)&msm_context.result_affine, sizeof(affine) * COMMITMENTS));
         for (int z = 0; z < COMMITMENTS; ++z)
@@ -738,7 +729,7 @@ extern "C" void init_bases_and_data(const void* bases, const int count)
     }
 #else
     //TODO: allocations
-    //exit(-1);
+    exit(-1);
 
     const int WINDOW_BITS_COUNT = 17;
     const int PRECOMPUTE_FACTOR = 8;
@@ -779,11 +770,24 @@ extern "C" void init_bases_and_data(const void* bases, const int count)
     do_msm(vector<void*>{nullptr}, 0, execSt1, true);
     if (execSt1 != execSt2)
         do_msm(vector<void*>{nullptr}, 0, execSt2, true);
-#endif   
-    
+#endif  
+}
+
+extern "C" void init_data(const int count)
+{
+    msm_call = 0;
+    setenv("CUDA_MODULE_LOADING", "EAGER", false);
+      
     bool first_alloc = (pi_from_gpu == nullptr);
     pi.clear();
     if (first_alloc) {
+        execSt1 = execSt2 = execSt3 = execSt4 = execSt5 = 0;
+        /*SAFE_CALL(cudaStreamCreate(&execSt1));
+        SAFE_CALL(cudaStreamCreate(&execSt2));
+        SAFE_CALL(cudaStreamCreate(&execSt3));
+        SAFE_CALL(cudaStreamCreate(&execSt4));
+        SAFE_CALL(cudaStreamCreate(&execSt5));*/
+    
         //printf("FIRST ALLOC!!\n");
         SAFE_CALL(cudaMallocHost((void**)&pi_from_gpu, sizeof(storage) * count));	        
    
@@ -918,8 +922,8 @@ extern "C" void init_bases_and_data(const void* bases, const int count)
                 printf("%d -> %d %d\n", elem.first, elem.second.size(), counts[elem.first]);
             }
 
-            for (auto& pp : created[elem.first])
-               SAFE_CALL(cudaMemset(pp, 0, sizeof(storage) * elem.first));
+            /*for (auto& pp : created[elem.first])
+               SAFE_CALL(cudaMemset(pp, 0, sizeof(storage) * elem.first));*/
         }
     }
     

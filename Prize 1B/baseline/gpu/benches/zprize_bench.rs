@@ -70,7 +70,13 @@ fn send_bases(coeffs_count: i32, ck: &CommitterKey<Bls12_381>) {
         .map(G1AffineNoInfinity::from)
         .collect::<Vec<_>>();
     unsafe {
-        init_bases_and_data(bases.as_ptr() as *const c_void, coeffs_count);
+        init_bases(bases.as_ptr() as *const c_void, coeffs_count);
+    }
+}
+
+fn init_data(coeffs_count: i32) {
+    unsafe {
+        init_data(coeffs_count);
     }
 }
 
@@ -146,6 +152,8 @@ fn main() {
     prover.prover_key = Some(pk);
     prover.register_data(coeffs_count);
 
+    send_bases(coeffs_count, &ck);
+
     // proof generation
     let now = std::time::Instant::now();
     println!("==============================");
@@ -155,11 +163,11 @@ fn main() {
     for i in 0..REPEAT {
         let mut circuit = &mut real_circuits[i];
 
-        send_bases(coeffs_count, &ck);
+        init_data(coeffs_count);
         send_merkle_tree(circuit);
+        run_composer(&mut prover);
 
         prover.copy_data();
-        run_composer(&mut prover);
 
         let real_prove_time = std::time::Instant::now();
 

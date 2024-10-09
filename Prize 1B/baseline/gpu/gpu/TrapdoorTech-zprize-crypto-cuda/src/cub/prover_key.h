@@ -342,4 +342,6 @@ extern "C" void copyArrays ()
 {
     prover_gpu.allocate_data();
     prover_gpu.copy_from_host(prover_host);
+    
+    SAFE_CALL(cudaDeviceSynchronize());
 }
